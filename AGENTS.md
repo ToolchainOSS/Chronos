@@ -117,5 +117,6 @@ task. **Hand-authored commit messages MUST follow the
 | Mounted GeoLite2 / CAIDA data files, env config, graceful degradation | [docs/agents/data-files.md](docs/agents/data-files.md) |
 | Axum WebSocket egress, Delta protocol, React/Zustand frontend | [docs/agents/egress-frontend.md](docs/agents/egress-frontend.md) |
 | Tests, CI gate, mock RIS integration, acceptance checks | [docs/agents/testing.md](docs/agents/testing.md) |
+| Bandwidth, CPU, and memory baseline for a running instance | [docs/agents/resource-baseline.md](docs/agents/resource-baseline.md) |
 | Full engineering standards & output contract | [docs/agents/engineering-standards.md](docs/agents/engineering-standards.md) |
 | Reusable agent skills (commit style, authoring) | [.github/skills/README.md](.github/skills/README.md) |
