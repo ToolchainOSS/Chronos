@@ -22,7 +22,7 @@ pub struct IngestConfig {
 impl Default for IngestConfig {
     fn default() -> Self {
         Self {
-            url: "ws://ris-live.ripe.net/v1/stream/?client=chronos".to_string(),
+            url: "ws://ris-live.ripe.net/v1/ws/?client=chronos".to_string(),
             host: None,
             require_updates_only: true,
             min_backoff: Duration::from_millis(500),

@@ -118,7 +118,7 @@ All configuration is read from environment variables (see `.env.example`):
 | Variable                        | Default                                             | Description                                  |
 | ------------------------------- | --------------------------------------------------- | -------------------------------------------- |
 | `CHRONOS_BIND_ADDR`             | `0.0.0.0:8080`                                      | HTTP and WebSocket bind address.             |
-| `CHRONOS_RIS_URL`               | `ws://ris-live.ripe.net/v1/stream/?client=chronos` | RIS Live endpoint.                           |
+| `CHRONOS_RIS_URL`               | `ws://ris-live.ripe.net/v1/ws/?client=chronos`     | RIS Live endpoint.                           |
 | `CHRONOS_RIS_HOST`              | (unset)                                             | Optional RIS collector host filter.          |
 | `CHRONOS_INGEST_CHANNEL_BOUND`  | `16384`                                             | Bounded ingest channel size (backpressure).  |
 | `CHRONOS_BROADCAST_CAPACITY`    | `8192`                                              | Delta broadcast ring buffer capacity.        |

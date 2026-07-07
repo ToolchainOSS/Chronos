@@ -1,6 +1,6 @@
 //! RIPE RIS Live message models.
 //!
-//! Reference stream: `ws://ris-live.ripe.net/v1/stream/`.
+//! Reference stream: `ws://ris-live.ripe.net/v1/ws/`.
 //!
 //! The public envelope looks like:
 //! ```json

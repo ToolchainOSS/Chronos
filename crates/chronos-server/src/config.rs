@@ -78,7 +78,7 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             bind_addr: "0.0.0.0:8080".parse().expect("valid default bind address"),
-            ris_url: "ws://ris-live.ripe.net/v1/stream/?client=chronos".to_string(),
+            ris_url: "ws://ris-live.ripe.net/v1/ws/?client=chronos".to_string(),
             ris_host: None,
             ingest_channel_bound: 16_384,
             broadcast_capacity: 8_192,

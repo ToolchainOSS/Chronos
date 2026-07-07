@@ -1,7 +1,7 @@
 //! RIPE RIS Live ingestion client.
 //!
 //! Responsibilities (blueprint Phase 1 and Phase 2, Task 2.1):
-//! - Connect asynchronously to `ws://ris-live.ripe.net/v1/stream/`.
+//! - Connect asynchronously to `ws://ris-live.ripe.net/v1/ws/`.
 //! - Subscribe to UPDATE messages (withdrawals arrive inside UPDATE frames on RIS
 //!   Live; there is no separate WITHDRAW subscription type).
 //! - Parse each frame into strongly typed structures.
