@@ -1,0 +1,25 @@
+[package]
+name = "chronos-ingest"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "RIPE RIS Live WebSocket ingestion: subscribe, parse, reconnect, and feed a bounded channel."
+
+[dependencies]
+chronos-types = { path = "../chronos-types" }
+tokio = { workspace = true, features = ["rt", "sync", "time", "macros"] }
+tokio-tungstenite = { workspace = true, features = ["connect"] }
+futures-util = { workspace = true, features = ["sink", "std"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+rand = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "net"] }
+tokio-tungstenite = { workspace = true, features = ["connect", "handshake"] }
+futures-util = { workspace = true, features = ["sink", "std"] }

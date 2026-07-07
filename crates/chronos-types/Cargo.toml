@@ -1,0 +1,17 @@
+[package]
+name = "chronos-types"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Core allocation-conscious primitive types for Project Chronos (ASN, IP prefixes, RIS Live models, egress delta frames)."
+
+[dependencies]
+serde = { workspace = true }
+ipnetwork = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

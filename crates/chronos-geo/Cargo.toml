@@ -1,0 +1,17 @@
+[package]
+name = "chronos-geo"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Prefix to ISO region resolution backed by mounted MaxMind GeoLite2 databases."
+
+[dependencies]
+chronos-types = { path = "../chronos-types" }
+ipnetwork = { workspace = true }
+maxminddb = { workspace = true }
+serde = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }

@@ -1,0 +1,17 @@
+[package]
+name = "chronos-topology"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "In-memory BGP topology: a radix (Patricia) trie mapping prefixes to origin ASNs, and an AS adjacency graph."
+
+[dependencies]
+chronos-types = { path = "../chronos-types" }
+dashmap = { workspace = true }
+ipnetwork = { workspace = true }
+parking_lot = "0.12"
+
+[dev-dependencies]

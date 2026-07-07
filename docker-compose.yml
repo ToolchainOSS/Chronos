@@ -1,0 +1,21 @@
+# Development and single node deployment for Project Chronos.
+#
+# Data files are mounted read only from ./data on the host. Populate ./data with:
+#   - GeoLite2-City.mmdb  (licensed; see the README for the dev download link)
+#   - GeoLite2-ASN.mmdb   (licensed; see the README for the dev download link)
+#   - as-rel.txt          (CAIDA AS relationships; optional)
+# None of these files are committed to source control.
+
+services:
+  chronos:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+    image: chronos:latest
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/data:ro
+    restart: unless-stopped

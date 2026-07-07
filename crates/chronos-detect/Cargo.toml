@@ -1,0 +1,16 @@
+[package]
+name = "chronos-detect"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Streaming BGP anomaly heuristics: origin hijack, valley-free path leak, and MAD based route churn."
+
+[dependencies]
+chronos-types = { path = "../chronos-types" }
+chronos-topology = { path = "../chronos-topology" }
+tracing = { workspace = true }
+
+[dev-dependencies]
