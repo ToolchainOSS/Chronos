@@ -4,8 +4,11 @@ Chronos is a real-time BGP anomaly detection engine: a Rust workspace that
 ingests the RIPE RIS Live feed, maintains in-memory internet topology, runs
 rule-based anomaly heuristics, and streams minimal delta frames to a React
 (Vite + TypeScript + Zustand) frontend over WebSockets. The engine is
-**stateless and in-memory** (no database); its only persistent inputs are
-read-only data files mounted at runtime.
+**stateless and in-memory by default** (no database on the hot path); its
+runtime inputs are read-only data files mounted at runtime. Persisting anomaly
+history to PostgreSQL is an **opt-in** feature (`CHRONOS_HISTORY_ENABLED`,
+crate `chronos-history`): off by default, lazily connected, written off the hot
+path, and bounded by retention plus a hard byte cap.
 
 This file is the always-on operating manual for coding agents. It is
 intentionally short; load the linked domain docs just-in-time for deeper work.

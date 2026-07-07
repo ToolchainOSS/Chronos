@@ -18,9 +18,10 @@ use chronos_detect::{
     DegreeHeuristic, RelationshipProvider, SurgeConfig, SurgeMonitor, parse_caida_as_rel,
 };
 use chronos_geo::GeoResolver;
+use chronos_history::HistoryConfig;
 use chronos_ingest::{IngestConfig, IngestStats};
 use chronos_server::config::AppConfig;
-use chronos_server::pipeline::Pipeline;
+use chronos_server::pipeline::{Pipeline, PipelineDeps};
 use chronos_server::state::AppState;
 use chronos_server::{caida, hub, metrics};
 use chronos_topology::{AsGraph, PrefixTable};
@@ -88,17 +89,25 @@ async fn main() -> anyhow::Result<()> {
         wait_shutdown(shutdown_rx.clone()),
     ));
 
+    // Persistent anomaly history (opt-in). Disabled by default so the engine
+    // stays stateless and in-memory; when enabled it records anomalies to
+    // PostgreSQL for the history view, bounded by retention and a byte cap. The
+    // connection is established lazily so startup never blocks on the database.
+    let history_config = HistoryConfig::from_env()?;
+    let history = chronos_history::spawn(history_config, wait_shutdown(shutdown_rx.clone()));
+
     // Detection pipeline (consumer).
     let surge = SurgeMonitor::new(SurgeConfig::default());
-    let pipeline = Pipeline::new(
-        graph.clone(),
-        prefixes.clone(),
+    let pipeline = Pipeline::new(PipelineDeps {
+        graph: graph.clone(),
+        prefixes: prefixes.clone(),
         relationships,
         surge,
-        geo.clone(),
-        delta_tx.clone(),
-        ingest_stats.clone(),
-    );
+        geo: geo.clone(),
+        deltas: delta_tx.clone(),
+        ingest_stats: ingest_stats.clone(),
+        history,
+    });
     let pipeline_handle = tokio::spawn(pipeline.run(
         ingest_rx,
         config.edge_ttl,

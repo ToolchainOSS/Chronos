@@ -84,4 +84,6 @@ scripts/resource-baseline.sh 60 300     # custom warmup/window in seconds
   Budget for roughly 160 GiB/day of ingress on an unfiltered feed, or apply
   `CHRONOS_RIS_HOST` to reduce it.
 - No disk or database load: datasets are cached under `CHRONOS_DATA_DIR` and the
-  topology is entirely in memory.
+  topology is entirely in memory. (Enabling the opt-in anomaly history adds a
+  PostgreSQL writer off the hot path, bounded to a hard byte cap; see the
+  "Persistent anomaly history" section in the README.)

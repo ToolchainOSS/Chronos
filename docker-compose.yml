@@ -24,3 +24,31 @@ services:
       # Read-write: Chronos caches the downloaded CAIDA dataset here.
       - ./data:/data
     restart: unless-stopped
+
+  # Optional persistent anomaly history (opt-in). Enabled only with the
+  # "history" compose profile, so the default stack stays stateless and needs no
+  # database:
+  #   docker compose --profile history up
+  # Then set in .env: CHRONOS_HISTORY_ENABLED=true and
+  #   CHRONOS_HISTORY_URL=postgres://chronos:chronos@postgres:5432/chronos
+  # Chronos bounds its own storage (retention window plus a hard byte cap, 2 GiB
+  # by default), so this volume does not grow without limit.
+  postgres:
+    image: postgres:17-alpine
+    profiles: ["history"]
+    environment:
+      POSTGRES_USER: chronos
+      POSTGRES_PASSWORD: chronos
+      POSTGRES_DB: chronos
+    volumes:
+      - chronos-history:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chronos"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  chronos-history:
+

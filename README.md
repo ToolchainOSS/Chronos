@@ -137,6 +137,10 @@ All configuration is read from environment variables (see `.env.example`):
 | `CHRONOS_CAIDA_BASE_URL`        | CAIDA serial-1 index                                | Directory index for auto-discovery.          |
 | `CHRONOS_GEOLITE2_CITY_DB`      | (unset)                                             | Mounted GeoLite2 City path.                  |
 | `CHRONOS_GEOLITE2_ASN_DB`       | (unset)                                             | Mounted GeoLite2 ASN path.                   |
+| `CHRONOS_HISTORY_ENABLED`       | `false`                                             | Persist anomalies to PostgreSQL (opt-in).    |
+| `CHRONOS_HISTORY_URL`           | (unset)                                             | Postgres URL; or set `DATABASE_URL`.         |
+| `CHRONOS_HISTORY_RETENTION_DAYS`| `30`                                                | Days of history retained before pruning.     |
+| `CHRONOS_HISTORY_MAX_BYTES`     | `2147483648`                                        | Hard cap on Chronos-owned history (2 GiB).   |
 | `RUST_LOG`                      | `info`                                              | Tracing filter (via `tracing-subscriber`).   |
 
 ### Recommended filter configurations
@@ -187,6 +191,45 @@ heuristics have less to work with. Filter for targeted monitoring; run
 unfiltered (or single-collector) for internet-wide detection. A malformed
 `CHRONOS_RIS_PREFIX` fails startup fast rather than silently yielding an empty
 feed.
+
+### Persistent anomaly history
+
+By default Chronos is **stateless and in-memory**: it holds live topology and
+streams deltas, but keeps no history. Enabling history (`CHRONOS_HISTORY_ENABLED=true`)
+durably records every detected anomaly to PostgreSQL so a deployment can offer a
+time-series / history view ("show me every hijack that touched my prefix last
+month").
+
+What is and is not recorded, by design:
+
+- **Recorded:** anomaly events (hijack, path-leak, route-churn) with their
+  timestamp, severity, prefix, origin ASNs, offending AS path, and impacted
+  region. This derived signal is tiny compared to the input firehose, so history
+  is cheap.
+- **Not recorded:** the raw RIS firehose and every `LinkUp`/`LinkDown` flap.
+  Re-warehousing raw BGP is what public archives (RIPE RIS, RouteViews) are for;
+  Chronos stores the signal it derives, not its input.
+
+**Storage is bounded perpetually.** Events land in one PostgreSQL partition per
+UTC day, so retention is enforced by dropping whole day-partitions (an `O(1)`
+`DROP TABLE`, never a bloating `DELETE`). Two limits apply together: an age
+window (`CHRONOS_HISTORY_RETENTION_DAYS`, default 30) and a hard byte cap
+(`CHRONOS_HISTORY_MAX_BYTES`, default 2 GiB). Whichever binds first, the oldest
+data is pruned so on-disk size never grows without limit.
+
+**Home lab vs enterprise.** The bundled Postgres (started with
+`docker compose --profile history up`) suits a single-user home lab: keep the
+2 GiB cap, or lower it. For an enterprise that wants unbounded, high-granularity
+history, do not raise the cap; instead scrape `/metrics` into your own Prometheus
+(or remote-write to a long-term TSDB). That data lives in your platform under
+your retention, entirely outside the Chronos-owned 2 GiB budget: Chronos
+produces, your observability stack stores.
+
+**Graceful and off the hot path.** History is opt-in, connects lazily (startup
+never blocks on the database), and writes on a dedicated background task fed by a
+bounded, drop-on-full channel. If the database is slow or unreachable, anomaly
+records are dropped and counted (`chronos_history_events_dropped_total`); the
+detection engine never stalls.
 
 ## Running locally
 

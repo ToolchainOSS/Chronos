@@ -1,0 +1,16 @@
+[package]
+name = "chronos-history"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Project Chronos persistent anomaly history: bounded PostgreSQL storage behind a pluggable sink."
+
+[dependencies]
+tokio = { workspace = true, features = ["rt", "macros", "sync", "time"] }
+tokio-postgres = { workspace = true }
+tracing = { workspace = true }
+metrics = { workspace = true }
+anyhow = { workspace = true }

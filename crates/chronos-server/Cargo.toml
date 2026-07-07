@@ -19,6 +19,7 @@ chronos-ingest = { path = "../chronos-ingest" }
 chronos-topology = { path = "../chronos-topology" }
 chronos-detect = { path = "../chronos-detect" }
 chronos-geo = { path = "../chronos-geo" }
+chronos-history = { path = "../chronos-history" }
 
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "signal", "net"] }
 axum = { workspace = true }
