@@ -24,16 +24,16 @@ use crate::config::AppConfig;
 use crate::pipeline::Pipeline;
 use crate::state::AppState;
 use chronos_detect::{
-    parse_caida_as_rel, DegreeHeuristic, RelationshipProvider, SurgeConfig, SurgeMonitor,
+    DegreeHeuristic, RelationshipProvider, SurgeConfig, SurgeMonitor, parse_caida_as_rel,
 };
 use chronos_geo::GeoResolver;
 use chronos_ingest::{IngestConfig, IngestStats};
 use chronos_topology::{AsGraph, PrefixTable};
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 use tokio::sync::{broadcast, mpsc, watch};
 use tracing::{info, warn};
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
@@ -190,7 +190,7 @@ async fn shutdown_signal(shutdown_tx: watch::Sender<bool>) {
 
     #[cfg(unix)]
     let terminate = async {
-        use tokio::signal::unix::{signal, SignalKind};
+        use tokio::signal::unix::{SignalKind, signal};
         match signal(SignalKind::terminate()) {
             Ok(mut stream) => {
                 stream.recv().await;

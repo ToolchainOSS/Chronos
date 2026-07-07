@@ -4,10 +4,10 @@ use crate::config::IngestConfig;
 use crate::parse::{parse_message, subscribe_message};
 use chronos_types::RisData;
 use futures_util::{SinkExt, StreamExt};
-use rand::Rng;
+use rand::RngExt;
 use std::future::Future;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::Message;
@@ -102,7 +102,7 @@ async fn connect_and_stream(
     };
 
     let subscribe = subscribe_message(config.host.as_deref());
-    if let Err(err) = socket.send(Message::Text(subscribe)).await {
+    if let Err(err) = socket.send(Message::Text(subscribe.into())).await {
         warn!(%err, "ingest: failed to send subscription");
         return ConnectionOutcome::Disconnected;
     }
@@ -117,9 +117,9 @@ async fn connect_and_stream(
             }
         };
 
-        let payload = match message {
-            Message::Text(text) => text.into_bytes(),
-            Message::Binary(bytes) => bytes,
+        let payload: Vec<u8> = match message {
+            Message::Text(text) => text.as_bytes().to_vec(),
+            Message::Binary(bytes) => bytes.into(),
             Message::Ping(_) | Message::Pong(_) => continue,
             Message::Close(_) => {
                 info!("ingest: server closed the connection");
@@ -157,7 +157,7 @@ async fn connect_and_stream(
 /// Apply +/- 20 percent jitter to a backoff duration to avoid thundering herds.
 fn apply_jitter(base: Duration) -> Duration {
     let millis = base.as_millis() as f64;
-    let factor = rand::thread_rng().gen_range(0.8..1.2);
+    let factor = rand::rng().random_range(0.8..1.2);
     Duration::from_millis((millis * factor) as u64)
 }
 

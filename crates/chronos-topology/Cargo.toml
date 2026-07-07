@@ -12,6 +12,6 @@ description = "In-memory BGP topology: a radix (Patricia) trie mapping prefixes 
 chronos-types = { path = "../chronos-types" }
 dashmap = { workspace = true }
 ipnetwork = { workspace = true }
-parking_lot = "0.12"
+parking_lot = "0.12.5"
 
 [dev-dependencies]

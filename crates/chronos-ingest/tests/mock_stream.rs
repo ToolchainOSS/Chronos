@@ -2,7 +2,7 @@
 //! client connects, sends a subscription, and pushes parsed routing messages into
 //! the bounded channel.
 
-use chronos_ingest::{run_ingest, IngestConfig, IngestStats};
+use chronos_ingest::{IngestConfig, IngestStats, run_ingest};
 use futures_util::{SinkExt, StreamExt};
 use std::sync::Arc;
 use std::time::Duration;
@@ -39,11 +39,15 @@ async fn ingest_client_receives_parsed_messages() {
 
         // Push a few fixtures, then a control frame that must be skipped.
         for _ in 0..3 {
-            ws.send(Message::Text(FIXTURE.to_string())).await.unwrap();
+            ws.send(Message::Text(FIXTURE.to_string().into()))
+                .await
+                .unwrap();
         }
-        ws.send(Message::Text(r#"{"type":"pong","data":{}}"#.to_string()))
-            .await
-            .unwrap();
+        ws.send(Message::Text(
+            r#"{"type":"pong","data":{}}"#.to_string().into(),
+        ))
+        .await
+        .unwrap();
 
         // Keep the connection open briefly so the client can drain frames.
         tokio::time::sleep(Duration::from_millis(200)).await;

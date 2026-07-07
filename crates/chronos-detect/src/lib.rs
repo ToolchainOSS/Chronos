@@ -24,6 +24,6 @@ pub use anomaly::{Anomaly, Severity};
 pub use origin::check_origin;
 pub use pathleak::PathLeakDetector;
 pub use relationships::{
-    parse_caida_as_rel, CaidaRelationships, DegreeHeuristic, Relationship, RelationshipProvider,
+    CaidaRelationships, DegreeHeuristic, Relationship, RelationshipProvider, parse_caida_as_rel,
 };
 pub use surge::{SurgeConfig, SurgeMonitor};

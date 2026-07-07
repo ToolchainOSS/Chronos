@@ -17,6 +17,6 @@ mod client;
 mod config;
 mod parse;
 
-pub use client::{run_ingest, IngestStats};
+pub use client::{IngestStats, run_ingest};
 pub use config::IngestConfig;
-pub use parse::{parse_message, subscribe_message, ParseError};
+pub use parse::{ParseError, parse_message, subscribe_message};

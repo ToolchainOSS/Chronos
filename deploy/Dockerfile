@@ -17,7 +17,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # ---- Rust build stage -----------------------------------------------------
-FROM rust:1.83-slim AS backend
+FROM rust:1.96-slim AS backend
 WORKDIR /app
 # Cache dependency compilation by copying manifests first.
 COPY Cargo.toml Cargo.lock* ./

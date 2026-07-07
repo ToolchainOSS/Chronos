@@ -25,11 +25,7 @@ pub enum EdgeChange {
 /// Canonicalize an undirected edge so `(a, b)` and `(b, a)` share one key.
 #[inline]
 fn edge_key(a: u32, b: u32) -> (u32, u32) {
-    if a <= b {
-        (a, b)
-    } else {
-        (b, a)
-    }
+    if a <= b { (a, b) } else { (b, a) }
 }
 
 /// A concurrent AS adjacency graph.

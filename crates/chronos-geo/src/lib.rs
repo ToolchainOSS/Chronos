@@ -16,7 +16,7 @@
 
 use chronos_types::{Asn, IpPrefix};
 use ipnetwork::IpNetwork;
-use maxminddb::{geoip2, MaxMindDBError, Reader};
+use maxminddb::{Reader, geoip2};
 use serde::Deserialize;
 use std::net::IpAddr;
 use std::path::Path;
@@ -61,17 +61,9 @@ impl GeoResolver {
         let ip = prefix_ip(prefix);
         let city: geoip2::City = lookup(reader, ip)?;
 
-        let country_code = city
-            .country
-            .as_ref()
-            .and_then(|c| c.iso_code)
-            .map(str::to_owned);
+        let country_code = city.country.iso_code.map(str::to_owned);
 
-        let subdivision_code = city
-            .subdivisions
-            .as_ref()
-            .and_then(|subs| subs.first())
-            .and_then(|s| s.iso_code);
+        let subdivision_code = city.subdivisions.first().and_then(|s| s.iso_code);
 
         match (country_code, subdivision_code) {
             (Some(country), Some(sub)) => Some(format!("{country}-{sub}")),
@@ -110,9 +102,16 @@ fn open_optional(label: &str, path: Option<&Path>) -> Option<Reader<Vec<u8>>> {
 }
 
 fn lookup<'de, T: Deserialize<'de>>(reader: &'de Reader<Vec<u8>>, ip: IpAddr) -> Option<T> {
-    match reader.lookup::<T>(ip) {
-        Ok(record) => Some(record),
-        Err(MaxMindDBError::AddressNotFoundError(_)) => None,
+    // maxminddb 0.29 splits lookup from decode: a missing address yields a
+    // `LookupResult` whose `decode` returns `Ok(None)` rather than an error.
+    match reader.lookup(ip) {
+        Ok(result) => match result.decode::<T>() {
+            Ok(record) => record,
+            Err(err) => {
+                warn!(%err, %ip, "geo: decode error");
+                None
+            }
+        },
         Err(err) => {
             warn!(%err, %ip, "geo: lookup error");
             None

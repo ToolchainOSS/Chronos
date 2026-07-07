@@ -7,14 +7,14 @@
 //! edges and refreshes the graph gauges.
 
 use crate::metrics as m;
-use chronos_detect::{check_origin, Anomaly, PathLeakDetector, RelationshipProvider, SurgeMonitor};
+use chronos_detect::{Anomaly, PathLeakDetector, RelationshipProvider, SurgeMonitor, check_origin};
 use chronos_geo::GeoResolver;
 use chronos_ingest::IngestStats;
 use chronos_topology::{AsGraph, PrefixTable};
 use chronos_types::{Delta, RisData};
 use std::future::Future;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::{broadcast, mpsc};
 use tracing::info;

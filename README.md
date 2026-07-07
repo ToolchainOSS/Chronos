@@ -43,7 +43,7 @@ The server never ships the full graph over the wire; it emits minimal deltas:
 
 ## Prerequisites
 
-- Rust (stable, 1.80 or newer).
+- Rust (stable, 1.85 or newer; the workspace uses the 2024 edition).
 - Node.js 20 or newer (22 recommended) for the frontend.
 - Optional: Docker with buildx for container builds.
 

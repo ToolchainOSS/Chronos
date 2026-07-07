@@ -8,12 +8,12 @@
 //! buffered frames are dropped) rather than stalling the producer.
 
 use crate::state::AppState;
-use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
+use axum::Router;
 use axum::extract::State;
+use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
-use axum::Router;
 use chronos_types::Delta;
 use futures_util::{SinkExt, StreamExt};
 use std::sync::atomic::Ordering;
@@ -66,7 +66,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     for (a, b) in state.graph.snapshot_edges(state.snapshot_max) {
         let frame = Delta::link_up(a, b);
         if let Ok(text) = serde_json::to_string(&frame) {
-            if sink.send(Message::Text(text)).await.is_err() {
+            if sink.send(Message::Text(text.into())).await.is_err() {
                 metrics::gauge!(crate::metrics::CONNECTED_CLIENTS).decrement(1.0);
                 return;
             }
@@ -81,7 +81,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                     Ok(delta) => {
                         match serde_json::to_string(&delta) {
                             Ok(text) => {
-                                if sink.send(Message::Text(text)).await.is_err() {
+                                if sink.send(Message::Text(text.into())).await.is_err() {
                                     break;
                                 }
                             }

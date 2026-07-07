@@ -3,8 +3,8 @@
 use chronos_topology::AsGraph;
 use chronos_types::Delta;
 use metrics_exporter_prometheus::PrometheusHandle;
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 use tokio::sync::broadcast;
 
 /// Cloneable shared state (all heavy fields are behind `Arc`).

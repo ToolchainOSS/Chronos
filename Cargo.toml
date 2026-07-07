@@ -11,31 +11,31 @@ members = [
 
 [workspace.package]
 version = "0.1.0"
-edition = "2021"
-rust-version = "1.80"
+edition = "2024"
+rust-version = "1.85"
 license = "MIT"
 authors = ["Toolchain OSS"]
 repository = "https://github.com/toolchain-oss/chronos"
 
 # Shared dependency versions (pinned) used across the workspace crates.
 [workspace.dependencies]
-tokio = { version = "1.40", default-features = false }
-tokio-tungstenite = { version = "0.24", default-features = false }
+tokio = { version = "1.52", default-features = false }
+tokio-tungstenite = { version = "0.29", default-features = false }
 futures-util = { version = "0.3", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 dashmap = "6"
-thiserror = "1"
+thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
-axum = { version = "0.7", features = ["ws"] }
+axum = { version = "0.8", features = ["ws"] }
 tower = "0.5"
-tower-http = { version = "0.6", features = ["trace", "cors"] }
-maxminddb = "0.24"
-ipnetwork = "0.20"
-metrics = "0.23"
-metrics-exporter-prometheus = { version = "0.15", default-features = false }
-rand = "0.8"
+tower-http = { version = "0.7", features = ["trace", "cors"] }
+maxminddb = "0.29"
+ipnetwork = "0.21"
+metrics = "0.24"
+metrics-exporter-prometheus = { version = "0.18", default-features = false }
+rand = "0.10"
 anyhow = "1"
 
 [profile.release]
