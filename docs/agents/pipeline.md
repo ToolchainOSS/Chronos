@@ -40,9 +40,11 @@ message must never tear down the connection: count it and continue.
 
 For each `RisData`:
 1. `graph.observe_path(&path, now)` → any newly observed edges emit `LinkUp`.
-2. `leak.inspect(&path)` → a path-leak anomaly if valley-free is violated.
+2. `leak.inspect(&path, now)` → a path-leak anomaly if valley-free is violated
+   (deduplicated per offending AS within a trailing window).
 3. Per announced prefix: `prefixes.observe(...)` + `check_origin(...)` (hijack),
-   and `surge.record(...)` (route churn).
+   and `surge.record(prefix, peer, now)` (route churn, keyed per vantage). Churn
+   is skipped for messages without a `peer_asn`.
 4. Withdrawals call `prefixes.remove(...)` so a re-announcement is treated as
    fresh, not a false origin change.
 

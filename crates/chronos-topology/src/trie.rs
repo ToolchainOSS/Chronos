@@ -21,15 +21,17 @@ pub struct OriginObservation {
     pub previous_origin: Option<Asn>,
     /// The origin now recorded for this exact prefix.
     pub current_origin: Asn,
-    /// True when the origin changed from a previously recorded (different) value.
+    /// True when a new distinct origin was observed for this prefix (one not seen
+    /// before). Alternating between already known origins is not a change.
     pub changed: bool,
-    /// The number of distinct origins ever seen for this exact prefix.
+    /// The number of distinct origins seen for this exact prefix.
     pub distinct_origins: u32,
 }
 
 impl OriginObservation {
-    /// True when this observation indicates a possible origin hijack: the prefix
-    /// was previously announced by a different ASN.
+    /// True when this observation indicates a possible origin hijack: a new
+    /// origin ASN appeared for a prefix that was already announced by at least
+    /// one other origin.
     #[inline]
     pub fn is_possible_hijack(&self) -> bool {
         self.changed && self.previous_origin.is_some()
@@ -42,9 +44,20 @@ struct Node {
     entry: Option<Entry>,
 }
 
+/// An upper bound on the distinct origins tracked per prefix. A prefix seen with
+/// this many origins is already flagrantly unstable; capping the set bounds
+/// memory and prevents an alert storm from a pathological prefix.
+const MAX_TRACKED_ORIGINS: usize = 16;
+
 struct Entry {
+    /// The most recently announced origin (what `longest_match` returns).
     origin: Asn,
-    distinct_origins: u32,
+    /// The distinct origins seen for this prefix, in first seen order, bounded by
+    /// `MAX_TRACKED_ORIGINS`. Tracking the set (rather than just the last origin)
+    /// is what stops legitimate multi origin (MOAS) prefixes from flip flopping:
+    /// once an origin is known, peers alternating between known origins raise no
+    /// further hijack signal.
+    origins: Vec<Asn>,
 }
 
 #[derive(Default)]
@@ -63,22 +76,33 @@ impl Trie {
         match node.entry.as_mut() {
             Some(entry) => {
                 let previous = entry.origin;
-                let changed = previous != origin;
-                if changed {
-                    entry.origin = origin;
-                    entry.distinct_origins = entry.distinct_origins.saturating_add(1);
+                // Always track the latest origin so longest match reflects the
+                // current announcement.
+                entry.origin = origin;
+
+                // A hijack signal fires only on a genuinely new origin: one not
+                // already in the known set. Alternating between known origins (a
+                // stable MOAS prefix observed from many vantage points) is not a
+                // change.
+                let is_new = !entry.origins.contains(&origin);
+                if is_new && entry.origins.len() < MAX_TRACKED_ORIGINS {
+                    entry.origins.push(origin);
                 }
+                // Suppress once the set is saturated so a chaotic prefix does not
+                // storm; it has already been flagged repeatedly.
+                let changed = is_new && entry.origins.len() <= MAX_TRACKED_ORIGINS;
+
                 OriginObservation {
                     previous_origin: Some(previous),
                     current_origin: origin,
                     changed,
-                    distinct_origins: entry.distinct_origins,
+                    distinct_origins: entry.origins.len() as u32,
                 }
             }
             None => {
                 node.entry = Some(Entry {
                     origin,
-                    distinct_origins: 1,
+                    origins: vec![origin],
                 });
                 OriginObservation {
                     previous_origin: None,
@@ -228,6 +252,39 @@ mod tests {
         assert_eq!(obs.previous_origin, Some(Asn(64500)));
         assert_eq!(obs.current_origin, Asn(64510));
         assert_eq!(obs.distinct_origins, 2);
+    }
+
+    #[test]
+    fn moas_flip_flop_flags_once_per_new_origin() {
+        // A stable multi origin prefix observed from many vantage points: the
+        // origin alternates between two known ASNs. Only the first appearance of
+        // the second origin is a change; subsequent flips raise no signal.
+        let table = PrefixTable::new();
+        let prefix = p("192.0.2.0/24");
+        assert!(!table.observe(&prefix, Asn(64500)).changed); // first sighting
+        assert!(table.observe(&prefix, Asn(64510)).changed); // new origin: flag
+        // Alternating between the two known origins is not a change.
+        for _ in 0..100 {
+            assert!(!table.observe(&prefix, Asn(64500)).changed);
+            assert!(!table.observe(&prefix, Asn(64510)).changed);
+        }
+        // A genuinely new third origin flags again and escalates the count.
+        let obs = table.observe(&prefix, Asn(64520));
+        assert!(obs.changed);
+        assert_eq!(obs.distinct_origins, 3);
+    }
+
+    #[test]
+    fn distinct_origins_is_bounded() {
+        // Even a pathological prefix cycling through many origins must not grow
+        // its tracked set without bound.
+        let table = PrefixTable::new();
+        let prefix = p("192.0.2.0/24");
+        for i in 0..1000u32 {
+            table.observe(&prefix, Asn(i));
+        }
+        let obs = table.observe(&prefix, Asn(10_000));
+        assert!(obs.distinct_origins <= 16);
     }
 
     #[test]

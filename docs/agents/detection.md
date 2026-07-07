@@ -28,15 +28,26 @@ All detectors return an `Anomaly` (`PrefixHijack` / `PathLeak` / `RouteChurn`)
 carrying a `Severity` (`Low`/`Medium`/`High`, mapped to a normalized index via
 `as_index()`). See [crates/chronos-detect/src/anomaly.rs](../../crates/chronos-detect/src/anomaly.rs).
 
-- **Origin / prefix hijack**: `check_origin(prefix, observation)` flags an
-  origin change or a more-specific announcement inconsistent with the recorded
-  origin. See [crates/chronos-detect/src/origin.rs](../../crates/chronos-detect/src/origin.rs).
+- **Origin / prefix hijack**: `check_origin(prefix, observation)` flags a
+  genuinely new origin ASN for a prefix that already had one. The `PrefixTable`
+  tracks the set of origins seen per prefix (bounded), so a legitimate
+  multi-origin (MOAS) prefix observed from many RIS peers alternating between
+  already-known origins does not flap: only the first appearance of each new
+  origin raises a signal. See [crates/chronos-detect/src/origin.rs](../../crates/chronos-detect/src/origin.rs).
 - **Path leak**: `PathLeakDetector<P>` applies the valley-free (Gao-Rexford)
-  rule using a `RelationshipProvider`. See
+  rule using a `RelationshipProvider`. It judges each intermediate AS locally as
+  a "valley apex" and requires both incident edges to be known, so gaps in the
+  relationship dataset cannot manufacture phantom valleys. Reports are
+  edge-triggered per offending AS within a trailing window so the many per-peer
+  copies of one leak collapse into a single episode. See
   [crates/chronos-detect/src/pathleak.rs](../../crates/chronos-detect/src/pathleak.rs).
-- **Route churn / surge**: `SurgeMonitor` tracks per-prefix announcement rates
-  in a sliding ring buffer and flags MAD-based (median absolute deviation)
-  outliers. `evict_stale(now)` prunes idle windows. See
+- **Route churn / surge**: `SurgeMonitor` tracks announcement rates per
+  `(prefix, peer)` vantage in a sliding ring buffer and flags MAD-based (median
+  absolute deviation) outliers above an absolute floor (`min_updates`). Keying
+  by vantage stops a stable prefix seen by many peers from looking like
+  flapping; the floor stops the adaptive threshold from collapsing when the
+  baseline is dominated by singletons; and detection is edge-triggered so an
+  ongoing episode reports once. `evict_stale(now)` prunes idle windows. See
   [crates/chronos-detect/src/surge.rs](../../crates/chronos-detect/src/surge.rs).
 
 ## Relationship provider (pluggable)

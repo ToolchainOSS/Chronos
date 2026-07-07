@@ -117,7 +117,7 @@ impl Pipeline {
         }
 
         // Path leak heuristic (no per prefix context needed).
-        if let Some(anomaly) = self.leak.inspect(&data.path) {
+        if let Some(anomaly) = self.leak.inspect(&data.path, now) {
             self.handle_anomaly(anomaly, now);
         }
 
@@ -130,8 +130,14 @@ impl Pipeline {
                     self.handle_anomaly(anomaly, now);
                 }
             }
-            if let Some(anomaly) = self.surge.record(prefix, now) {
-                self.handle_anomaly(anomaly, now);
+            // Route churn is measured per vantage point (prefix, peer) so that a
+            // stable prefix seen by many RIS peers is not mistaken for flapping.
+            // Messages without a peer ASN cannot be attributed to a vantage, so
+            // they are skipped for churn.
+            if let Some(peer) = data.peer_asn {
+                if let Some(anomaly) = self.surge.record(prefix, peer, now) {
+                    self.handle_anomaly(anomaly, now);
+                }
             }
         }
 
