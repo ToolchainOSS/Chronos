@@ -1,7 +1,7 @@
 //! The connect, subscribe, read, and reconnect loop.
 
 use crate::config::IngestConfig;
-use crate::parse::{parse_message, subscribe_message};
+use crate::parse::{SubscribeFilters, parse_message, subscribe_message};
 use chronos_types::RisData;
 use futures_util::{SinkExt, StreamExt};
 use rand::RngExt;
@@ -101,7 +101,13 @@ async fn connect_and_stream(
         }
     };
 
-    let subscribe = subscribe_message(config.host.as_deref());
+    let subscribe = subscribe_message(&SubscribeFilters {
+        host: config.host.as_deref(),
+        path: config.path.as_deref(),
+        prefix: config.prefix.as_deref(),
+        more_specific: config.more_specific,
+        less_specific: config.less_specific,
+    });
     if let Err(err) = socket.send(Message::Text(subscribe.into())).await {
         warn!(%err, "ingest: failed to send subscription");
         return ConnectionOutcome::Disconnected;

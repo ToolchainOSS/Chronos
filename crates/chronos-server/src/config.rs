@@ -23,7 +23,10 @@
 use std::env;
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::time::Duration;
+
+use chronos_types::IpPrefix;
 
 /// Default writable data directory for cached datasets and volatile runtime
 /// state. In containers this is the mounted volume; see the Dockerfile.
@@ -43,6 +46,18 @@ pub struct AppConfig {
     pub ris_url: String,
     /// Optional RIS collector host filter.
     pub ris_host: Option<String>,
+    /// Optional RIS AS-path filter; a bare ASN matches any update whose path
+    /// traverses that AS ("watch anything involving my network").
+    pub ris_path: Option<String>,
+    /// Optional RIS prefix filter; only updates covering this prefix are
+    /// delivered.
+    pub ris_prefix: Option<String>,
+    /// With a prefix filter, also include more-specific prefixes (the classic
+    /// sub-prefix hijack signal). Ignored when no prefix is set.
+    pub ris_more_specific: bool,
+    /// With a prefix filter, also include less-specific prefixes. Ignored when
+    /// no prefix is set.
+    pub ris_less_specific: bool,
     /// Bound of the ingestion channel (producer to consumer backpressure).
     pub ingest_channel_bound: usize,
     /// Capacity of the broadcast ring buffer shared with WebSocket clients.
@@ -80,6 +95,10 @@ impl Default for AppConfig {
             bind_addr: "0.0.0.0:8080".parse().expect("valid default bind address"),
             ris_url: "ws://ris-live.ripe.net/v1/ws/?client=chronos".to_string(),
             ris_host: None,
+            ris_path: None,
+            ris_prefix: None,
+            ris_more_specific: false,
+            ris_less_specific: false,
             ingest_channel_bound: 16_384,
             broadcast_capacity: 8_192,
             snapshot_max: 2_000,
@@ -112,6 +131,22 @@ impl AppConfig {
             config.ris_url = url;
         }
         config.ris_host = env::var("CHRONOS_RIS_HOST").ok().filter(|s| !s.is_empty());
+        config.ris_path = env::var("CHRONOS_RIS_PATH").ok().filter(|s| !s.is_empty());
+        config.ris_prefix = env::var("CHRONOS_RIS_PREFIX")
+            .ok()
+            .filter(|s| !s.is_empty());
+        // Fail fast on a malformed prefix filter: RIS Live would silently return
+        // nothing, which looks like a dead feed rather than a config error.
+        if let Some(prefix) = &config.ris_prefix {
+            IpPrefix::from_str(prefix)
+                .map_err(|e| anyhow::anyhow!("invalid CHRONOS_RIS_PREFIX '{prefix}': {e}"))?;
+        }
+        if let Some(v) = parse_env_bool("CHRONOS_RIS_MORE_SPECIFIC")? {
+            config.ris_more_specific = v;
+        }
+        if let Some(v) = parse_env_bool("CHRONOS_RIS_LESS_SPECIFIC")? {
+            config.ris_less_specific = v;
+        }
 
         if let Some(v) = parse_env_usize("CHRONOS_INGEST_CHANNEL_BOUND")? {
             config.ingest_channel_bound = v;

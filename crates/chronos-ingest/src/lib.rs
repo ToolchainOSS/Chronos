@@ -19,4 +19,4 @@ mod parse;
 
 pub use client::{IngestStats, run_ingest};
 pub use config::IngestConfig;
-pub use parse::{ParseError, parse_message, subscribe_message};
+pub use parse::{ParseError, SubscribeFilters, parse_message, subscribe_message};

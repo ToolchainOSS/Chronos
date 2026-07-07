@@ -75,6 +75,10 @@ async fn main() -> anyhow::Result<()> {
     let ingest_config = IngestConfig {
         url: config.ris_url.clone(),
         host: config.ris_host.clone(),
+        path: config.ris_path.clone(),
+        prefix: config.ris_prefix.clone(),
+        more_specific: config.ris_more_specific,
+        less_specific: config.ris_less_specific,
         ..IngestConfig::default()
     };
     let ingest_handle = tokio::spawn(chronos_ingest::run_ingest(

@@ -119,7 +119,11 @@ All configuration is read from environment variables (see `.env.example`):
 | ------------------------------- | --------------------------------------------------- | -------------------------------------------- |
 | `CHRONOS_BIND_ADDR`             | `0.0.0.0:8080`                                      | HTTP and WebSocket bind address.             |
 | `CHRONOS_RIS_URL`               | `ws://ris-live.ripe.net/v1/ws/?client=chronos`     | RIS Live endpoint.                           |
-| `CHRONOS_RIS_HOST`              | (unset)                                             | Optional RIS collector host filter.          |
+| `CHRONOS_RIS_HOST`              | (unset)                                             | Only this collector (for example `rrc00`).   |
+| `CHRONOS_RIS_PATH`              | (unset)                                             | Only updates whose AS path matches (bare ASN = any path via that AS). |
+| `CHRONOS_RIS_PREFIX`            | (unset)                                             | Only updates covering this prefix (CIDR).    |
+| `CHRONOS_RIS_MORE_SPECIFIC`     | `false`                                             | With a prefix, also match more-specifics (sub-prefix hijacks). |
+| `CHRONOS_RIS_LESS_SPECIFIC`     | `false`                                             | With a prefix, also match less-specifics.    |
 | `CHRONOS_INGEST_CHANNEL_BOUND`  | `16384`                                             | Bounded ingest channel size (backpressure).  |
 | `CHRONOS_BROADCAST_CAPACITY`    | `8192`                                              | Delta broadcast ring buffer capacity.        |
 | `CHRONOS_SNAPSHOT_MAX`          | `2000`                                              | Max edges in a new client's initial snapshot.|
@@ -134,6 +138,55 @@ All configuration is read from environment variables (see `.env.example`):
 | `CHRONOS_GEOLITE2_CITY_DB`      | (unset)                                             | Mounted GeoLite2 City path.                  |
 | `CHRONOS_GEOLITE2_ASN_DB`       | (unset)                                             | Mounted GeoLite2 ASN path.                   |
 | `RUST_LOG`                      | `info`                                              | Tracing filter (via `tracing-subscriber`).   |
+
+### Recommended filter configurations
+
+Chronos subscribes to the RIS Live firehose and, by default, ingests every BGP
+update globally (~160 GiB/day; see
+[docs/agents/resource-baseline.md](docs/agents/resource-baseline.md)). The RIS
+filters below are applied **server-side**, so RIPE never sends what you do not
+want: they cut bandwidth and CPU at the source and sharpen signal. Pick the
+profile that matches your goal.
+
+**1. Global observatory (default) — full situational awareness.**
+Leave all `CHRONOS_RIS_*` filters unset. Highest fidelity: every collector,
+every prefix, so the topology graph and the global heuristics (route-leak
+detection, degree surges) see the whole internet. Highest cost (~160 GiB/day,
+~20% of one core). Use it for research or a well-provisioned backend.
+
+**2. Single vantage point — broad but cheaper.**
+```bash
+CHRONOS_RIS_HOST=rrc00        # one collector (rrc00 is a large, global peer)
+```
+Retains broad prefix coverage from one collector's viewpoint at a fraction of
+the bandwidth. Trade-off: anomalies only visible from other collectors' peers
+may be missed. A good default for resource-constrained deployments.
+
+**3. Watch your own network — everything involving your AS.**
+```bash
+CHRONOS_RIS_PATH=64500        # your ASN; matches any update whose path uses it
+```
+Only updates whose AS path traverses your AS. Dramatically lower volume; ideal
+for an operator monitoring their own footprint, upstreams, and route leaks that
+touch them.
+
+**4. Defend your prefixes — sub-prefix hijack watch (highest signal).**
+```bash
+CHRONOS_RIS_PREFIX=192.0.2.0/24
+CHRONOS_RIS_MORE_SPECIFIC=true   # also catch longer, more-specific announcements
+```
+Only updates for your prefix and any more-specific announcement inside it. A
+classic hijack announces a more-specific of your space to steal traffic, so
+this is the canonical low-noise setup to detect an attack on your own address
+blocks. Lowest bandwidth of all profiles.
+
+Filters combine (for example a `CHRONOS_RIS_PATH` plus a `CHRONOS_RIS_HOST`
+narrows to one collector's view of your AS). Note the trade-off: the tighter
+you filter, the narrower the in-memory topology graph, so the global-view
+heuristics have less to work with. Filter for targeted monitoring; run
+unfiltered (or single-collector) for internet-wide detection. A malformed
+`CHRONOS_RIS_PREFIX` fails startup fast rather than silently yielding an empty
+feed.
 
 ## Running locally
 
