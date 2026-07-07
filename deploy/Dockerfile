@@ -1,9 +1,12 @@
 # Multi-stage, multi-arch build for the Chronos server plus the static frontend.
 #
-# Data files (GeoLite2 .mmdb and CAIDA AS relationship datasets) are NEVER copied
-# into this image. They are mounted at runtime (see the README) and their paths
-# are supplied through environment variables:
+# Runtime data lives under a single writable data directory (/data). The CAIDA
+# AS-relationship dataset is downloaded and cached there automatically at
+# startup, so no dataset needs to be mounted for the happy path. Optionally,
+# operators may mount their own files and point the matching environment
+# variables at them:
 #   CHRONOS_GEOLITE2_CITY_DB, CHRONOS_GEOLITE2_ASN_DB, CHRONOS_CAIDA_ASREL
+# GeoLite2 databases are never bundled into this image.
 #
 # Build for a specific platform (for example OCI Ampere A1) with buildx:
 #   docker buildx build --platform linux/arm64 -t chronos:arm64 -f deploy/Dockerfile .
@@ -39,7 +42,11 @@ COPY --from=backend /app/target/release/chronos-server /usr/local/bin/chronos-se
 COPY --from=frontend /app/frontend/dist /app/static
 
 ENV CHRONOS_BIND_ADDR=0.0.0.0:8080
-# Directory where operators are expected to mount the read only data files.
+# Single writable directory for cached datasets and volatile runtime state.
+# Mount a host path here in production to persist the CAIDA cache across
+# restarts; it must be writable by the non-root runtime user.
+ENV CHRONOS_DATA_DIR=/data
+RUN mkdir -p /data && chown chronos:chronos /data
 VOLUME ["/data"]
 
 EXPOSE 8080

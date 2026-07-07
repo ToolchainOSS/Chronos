@@ -37,6 +37,8 @@ metrics = "0.24"
 metrics-exporter-prometheus = { version = "0.18", default-features = false }
 rand = "0.10"
 anyhow = "1"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "charset"] }
+bzip2 = "0.6"
 
 [profile.release]
 opt-level = 3

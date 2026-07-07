@@ -22,8 +22,9 @@ use chronos_ingest::{IngestConfig, IngestStats};
 use chronos_server::config::AppConfig;
 use chronos_server::pipeline::Pipeline;
 use chronos_server::state::AppState;
-use chronos_server::{hub, metrics};
+use chronos_server::{caida, hub, metrics};
 use chronos_topology::{AsGraph, PrefixTable};
+use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use tokio::sync::{broadcast, mpsc, watch};
@@ -42,8 +43,11 @@ async fn main() -> anyhow::Result<()> {
     let graph = Arc::new(AsGraph::new());
     let prefixes = Arc::new(PrefixTable::new());
 
-    // AS relationship provider selection.
-    let relationships = build_relationship_provider(&config, graph.clone());
+    // AS relationship provider selection. The CAIDA dataset is acquired
+    // automatically (or from a mounted file / pinned URL); acquisition degrades
+    // gracefully to the degree heuristic on any failure.
+    let caida_path = caida::resolve_dataset(&config).await;
+    let relationships = build_relationship_provider(caida_path.as_deref(), &config, graph.clone());
 
     // Geo resolver from mounted databases (degrades gracefully when absent).
     let geo = Arc::new(GeoResolver::load(
@@ -124,19 +128,28 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn build_relationship_provider(
+    caida_path: Option<&Path>,
     config: &AppConfig,
     graph: Arc<AsGraph>,
 ) -> Arc<dyn RelationshipProvider> {
-    if let Some(path) = &config.caida_as_rel {
+    if let Some(path) = caida_path {
         match std::fs::read_to_string(path) {
             Ok(contents) => {
                 let rels = parse_caida_as_rel(&contents);
-                info!(
-                    path = %path.display(),
-                    entries = rels.len(),
-                    "chronos: loaded CAIDA AS relationships"
-                );
-                return Arc::new(rels);
+                if rels.is_empty() {
+                    warn!(
+                        path = %path.display(),
+                        "chronos: CAIDA dataset parsed to zero relationships; \
+                         falling back to degree heuristic"
+                    );
+                } else {
+                    info!(
+                        path = %path.display(),
+                        entries = rels.len(),
+                        "chronos: loaded CAIDA AS relationships"
+                    );
+                    return Arc::new(rels);
+                }
             }
             Err(err) => {
                 warn!(
@@ -148,8 +161,9 @@ fn build_relationship_provider(
         }
     } else {
         info!(
-            "chronos: no CAIDA dataset configured; using degree based relationship heuristic \
-             (set CHRONOS_CAIDA_ASREL to a mounted dataset for higher fidelity leak detection)"
+            "chronos: no CAIDA dataset available; using degree based relationship heuristic \
+             (set CHRONOS_CAIDA_ASREL, CHRONOS_CAIDA_URL, or leave auto-download enabled for \
+             higher fidelity leak detection)"
         );
     }
     Arc::new(DegreeHeuristic::new(graph, config.degree_ratio))

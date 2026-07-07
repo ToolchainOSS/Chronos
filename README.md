@@ -58,25 +58,50 @@ git clone --recurse-submodules <repo-url>
 git submodule update --init --recursive
 ```
 
-## Mounted data files
+## Runtime data directory and external datasets
 
-Chronos depends on two external datasets. Neither is bundled into the image nor
-committed to source control (they are copyrighted and/or large binaries). Both
-are mounted at runtime and located by environment variable. When a file is not
-configured or cannot be read, the corresponding feature degrades gracefully and
-the service keeps running.
+Chronos keeps all volatile runtime state under a single writable data directory
+(`CHRONOS_DATA_DIR`, default `/data`). In Docker this is a mounted volume, so a
+deployment persists one host path for everything derived at runtime (currently
+the cached CAIDA dataset).
 
-| Purpose                      | Environment variable          | When absent                                            |
-| ---------------------------- | ----------------------------- | ------------------------------------------------------ |
-| GeoLite2 City (region codes) | `CHRONOS_GEOLITE2_CITY_DB`    | Region resolution disabled; no `AreaDegraded` deltas.  |
-| GeoLite2 ASN (ASN lookup)    | `CHRONOS_GEOLITE2_ASN_DB`     | ASN geo lookup disabled.                               |
-| CAIDA AS relationships       | `CHRONOS_CAIDA_ASREL`         | Path leak detection uses a degree-based heuristic.     |
+External datasets are never committed to source control (they are copyrighted
+and/or large binaries). When one is unavailable the corresponding feature
+degrades gracefully and the service keeps running.
+
+| Purpose                      | Source                                             | When absent                                            |
+| ---------------------------- | -------------------------------------------------- | ------------------------------------------------------ |
+| CAIDA AS relationships       | Auto-downloaded and cached (or mounted / pinned)   | Path leak detection uses a degree-based heuristic.     |
+| GeoLite2 City (region codes) | Mounted file (`CHRONOS_GEOLITE2_CITY_DB`)          | Region resolution disabled; no `AreaDegraded` deltas.  |
+| GeoLite2 ASN (ASN lookup)    | Mounted file (`CHRONOS_GEOLITE2_ASN_DB`)           | ASN geo lookup disabled.                               |
+
+### CAIDA AS relationships (zero configuration)
+
+Path leak detection is most accurate with CAIDA AS relationship data. In the
+happy path you configure nothing: on startup Chronos discovers the latest
+`as-rel` dataset under
+[publicdata.caida.org](https://publicdata.caida.org/datasets/as-relationships/serial-1/),
+downloads it once, decompresses it, and caches the plain-text copy under
+`<data_dir>/cache/caida/`. The date-stamped filename means a new month is picked
+up automatically, and the cached copy is reused on later runs so CAIDA's server
+is not hit repeatedly. Acquisition is best-effort and bounded by a timeout; on
+any failure (no network, unreachable mirror) Chronos logs a warning and falls
+back to the degree heuristic.
+
+Overrides, in order of precedence:
+
+1. `CHRONOS_CAIDA_ASREL`: point at a mounted file (plain `.txt` or `.bz2`).
+2. `CHRONOS_CAIDA_URL`: pin an exact dataset URL to fetch and cache (useful for
+   a reproducible point-in-time dataset).
+3. `CHRONOS_CAIDA_AUTODOWNLOAD=false`: disable auto-download entirely (forces
+   the degree heuristic when no file or URL is configured).
 
 ### GeoLite2 (MaxMind)
 
 The GeoLite2 City and ASN databases are copyrighted by MaxMind and are large
 binary files; they must never be committed. For local development (this project
-is already licensed), download them and place them under `./data`:
+is already licensed), download them into the data directory and point the
+matching variables at them:
 
 ```bash
 mkdir -p data
@@ -85,15 +110,6 @@ curl -L -o data/GeoLite2-ASN.mmdb  https://s.joefang.org/GeoLite2-ASN
 ```
 
 The `.gitignore` already excludes `*.mmdb` and the `data/` directory.
-
-### CAIDA AS relationships
-
-Path leak detection is most accurate with CAIDA AS relationship data. Mount the
-`as-rel` dataset (the `as1|as2|rel` text format) and point `CHRONOS_CAIDA_ASREL`
-at it. When it is not configured, Chronos falls back to a degree-based heuristic
-that infers provider/customer relationships from peering degree in the live
-graph; this is an approximation and is logged at startup. The dataset is also
-excluded from source control.
 
 ## Configuration
 
@@ -110,9 +126,13 @@ All configuration is read from environment variables (see `.env.example`):
 | `CHRONOS_EDGE_TTL_SECS`         | `900`                                               | Edge age-out TTL (drives `LinkDown`).        |
 | `CHRONOS_SWEEP_INTERVAL_SECS`   | `60`                                                | Interval between edge aging sweeps.          |
 | `CHRONOS_DEGREE_RATIO`          | `4.0`                                               | Degree ratio for the fallback heuristic.     |
+| `CHRONOS_DATA_DIR`              | `/data`                                             | Writable dir for cached datasets and state.  |
+| `CHRONOS_CAIDA_ASREL`           | (unset)                                             | Mounted CAIDA dataset path (`.txt`/`.bz2`).  |
+| `CHRONOS_CAIDA_URL`             | (unset)                                             | Exact CAIDA dataset URL to fetch and cache.  |
+| `CHRONOS_CAIDA_AUTODOWNLOAD`    | `true`                                              | Auto-discover and cache the latest dataset.  |
+| `CHRONOS_CAIDA_BASE_URL`        | CAIDA serial-1 index                                | Directory index for auto-discovery.          |
 | `CHRONOS_GEOLITE2_CITY_DB`      | (unset)                                             | Mounted GeoLite2 City path.                  |
 | `CHRONOS_GEOLITE2_ASN_DB`       | (unset)                                             | Mounted GeoLite2 ASN path.                   |
-| `CHRONOS_CAIDA_ASREL`           | (unset)                                             | Mounted CAIDA AS relationship dataset path.  |
 | `RUST_LOG`                      | `info`                                              | Tracing filter (via `tracing-subscriber`).   |
 
 ## Running locally
@@ -120,9 +140,11 @@ All configuration is read from environment variables (see `.env.example`):
 Backend:
 
 ```bash
-export CHRONOS_GEOLITE2_CITY_DB=$PWD/data/GeoLite2-City.mmdb
-export CHRONOS_GEOLITE2_ASN_DB=$PWD/data/GeoLite2-ASN.mmdb
-# Optional: export CHRONOS_CAIDA_ASREL=$PWD/data/as-rel.txt
+# Zero config: Chronos auto-downloads the CAIDA dataset into ./data on startup.
+export CHRONOS_DATA_DIR=$PWD/data
+# Optional geo enrichment (licensed GeoLite2 files):
+# export CHRONOS_GEOLITE2_CITY_DB=$PWD/data/GeoLite2-City.mmdb
+# export CHRONOS_GEOLITE2_ASN_DB=$PWD/data/GeoLite2-ASN.mmdb
 cargo run -p chronos-server --release
 ```
 
@@ -149,7 +171,7 @@ Then open the printed Vite URL (default `http://localhost:5173`).
 # Build for OCI Ampere A1 (ARM64):
 docker buildx build --platform linux/arm64 -t chronos:arm64 -f deploy/Dockerfile .
 
-# Or run with compose (mounts ./data read only into /data):
+# Or run with compose (mounts ./data read-write into /data for the cache):
 cp .env.example .env
 docker compose up --build
 ```

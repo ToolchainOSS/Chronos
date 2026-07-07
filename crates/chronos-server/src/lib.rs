@@ -7,6 +7,7 @@
 //! Style note: comments avoid em dashes; they use colons, semicolons, and
 //! parentheses instead.
 
+pub mod caida;
 pub mod config;
 pub mod hub;
 pub mod metrics;

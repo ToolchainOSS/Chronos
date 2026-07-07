@@ -1,9 +1,13 @@
 # Development and single node deployment for Project Chronos.
 #
-# Data files are mounted read only from ./data on the host. Populate ./data with:
+# The ./data host directory is a single writable volume for all runtime state.
+# Chronos downloads and caches the CAIDA AS-relationship dataset there
+# automatically on startup, so nothing needs to be placed in it for the happy
+# path. Optionally, drop mounted files into ./data and point the matching
+# CHRONOS_* variables at them (see .env.example):
 #   - GeoLite2-City.mmdb  (licensed; see the README for the dev download link)
 #   - GeoLite2-ASN.mmdb   (licensed; see the README for the dev download link)
-#   - as-rel.txt          (CAIDA AS relationships; optional)
+#   - a CAIDA as-rel dataset (optional; auto-downloaded when absent)
 # None of these files are committed to source control.
 
 services:
@@ -17,5 +21,6 @@ services:
     env_file:
       - .env
     volumes:
-      - ./data:/data:ro
+      # Read-write: Chronos caches the downloaded CAIDA dataset here.
+      - ./data:/data
     restart: unless-stopped
