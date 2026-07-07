@@ -1,0 +1,38 @@
+# Keep the Docker build context lean and never leak data files or build output.
+#
+# Rationale: the multi-stage Dockerfile rebuilds the frontend and the backend
+# from source inside the image, so build artifacts, dependency caches, and VCS
+# metadata add nothing but bloat. Mounted data files (GeoLite2 .mmdb, CAIDA
+# AS-relationship datasets) must NEVER enter an image; they are provided at
+# runtime by volume mount.
+
+# Rust build output
+/target
+**/target
+
+# Node dependencies and build output (rebuilt inside the frontend stage)
+**/node_modules
+frontend/dist
+
+# Version control and CI/agent metadata
+.git
+.gitignore
+.gitmodules
+.github
+
+# Mounted, gitignored data files (defense in depth; also excluded by .gitignore)
+/data
+**/*.mmdb
+**/*as-rel*
+.env
+.env.*
+
+# Editor / OS cruft
+.vscode
+.idea
+**/.DS_Store
+
+# Docs and local notes not needed to build
+docs
+*.md
+!README.md

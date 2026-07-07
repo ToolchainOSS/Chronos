@@ -1,34 +1,46 @@
 name: CI
 
 on:
+  pull_request:
   push:
     branches: [main]
-  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Deny-all by default; each job opts into the narrowest scope it needs. This
+# workflow only ever reads the checked-out code, so no privileged token is minted
+# and untrusted PR code (or a compromised build dependency) has nothing to steal.
+permissions: {}
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: -D warnings
 
 jobs:
-  rust:
-    name: Rust (fmt, clippy, test)
+  backend:
+    name: Backend (fmt, clippy, tests, acceptance)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
 
-      - name: Cache cargo
-        uses: actions/cache@v4
+      # Compiler cache with a sharp trust boundary: only builds on the default
+      # branch may *write* the cache (`save-if`), while pull requests restore it
+      # read-only. A PR reuses main's warm cache for speed but can never persist
+      # a poisoned artifact that a later trusted build would consume.
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Format check
         run: cargo fmt --all -- --check
@@ -36,19 +48,25 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
-      - name: Test
+      - name: Test (unit, mock RIS integration, and e2e acceptance)
         # GeoLite2 and CAIDA data files are not present in CI (never committed);
         # tests exercise the disabled geo and heuristic relationship fallbacks.
-        run: cargo test --workspace
+        # `--workspace` includes the chronos-server acceptance suite, which
+        # drives the real Axum router and the Delta WebSocket wire contract.
+        run: cargo test --workspace --all-targets
 
   frontend:
     name: Frontend (typecheck, lint, build)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -58,7 +76,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install
-        run: npm ci || npm install
+        run: npm ci
 
       - name: Typecheck
         run: npm run typecheck
@@ -68,25 +86,3 @@ jobs:
 
       - name: Build
         run: npm run build
-
-  docker:
-    name: Docker build (arm64)
-    runs-on: ubuntu-latest
-    needs: [rust, frontend]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build image (linux/arm64)
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: deploy/Dockerfile
-          platforms: linux/arm64
-          push: false
-          tags: chronos:ci-arm64

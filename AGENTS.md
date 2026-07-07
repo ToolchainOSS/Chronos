@@ -22,7 +22,7 @@ intentionally short; load the linked domain docs just-in-time for deeper work.
 # Backend quality gate (matches CI)
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace              # includes the mock RIS Live integration test
+cargo test --workspace --all-targets  # includes the mock RIS integration test + e2e acceptance suite
 
 # Frontend quality gate
 cd frontend && npm ci && npm run typecheck && npm run lint && npm run build

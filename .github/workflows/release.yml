@@ -1,0 +1,88 @@
+name: Release Binaries
+
+# Build the chronos-server binary natively for each target and attach the
+# artifacts to the GitHub Release for the pushed `v*` tag. Container images for
+# the same tag are published separately by docker-publish.yml.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+# Deny-all by default. The release-write token is granted only to the dedicated
+# `release` job, which runs no third-party build code.
+permissions: {}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    # Read-only: this job runs untrusted third-party code (cargo build scripts
+    # and proc-macros). Without write scopes, a poisoned dependency has no
+    # release/packages token to steal. Compiled artifacts are handed to the
+    # privileged `release` job out-of-band via the artifact store.
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # arm64 and amd64 are both built natively on matching hosts, never
+          # cross-compiled, mirroring the Docker build strategy.
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            asset_name: chronos-server-linux-amd64
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            asset_name: chronos-server-linux-arm64
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build release binary
+        run: cargo build --release --locked --target ${{ matrix.target }} --bin chronos-server
+
+      - name: Stage binary
+        run: |
+          mkdir -p dist
+          cp "target/${{ matrix.target }}/release/chronos-server" "dist/${{ matrix.asset_name }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: dist/${{ matrix.asset_name }}
+          if-no-files-found: error
+
+  # Privileged publish step, isolated from all build code. It only downloads the
+  # already-built artifacts and attaches them to the release, so the
+  # `contents: write` token is never exposed to cargo dependency code.
+  release:
+    name: Attach binaries to release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download built binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          fail_on_unmatched_files: true
+          generate_release_notes: true

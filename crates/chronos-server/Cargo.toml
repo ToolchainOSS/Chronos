@@ -34,4 +34,7 @@ metrics-exporter-prometheus = { workspace = true }
 anyhow = { workspace = true }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "net"] }
+tokio-tungstenite = { workspace = true, features = ["connect", "handshake"] }
+tower = { workspace = true, features = ["util"] }
+http-body-util = "0.1"

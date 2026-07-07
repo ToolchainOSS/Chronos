@@ -24,3 +24,12 @@ pub fn install() -> anyhow::Result<PrometheusHandle> {
         .map_err(|e| anyhow::anyhow!("failed to install Prometheus recorder: {e}"))?;
     Ok(handle)
 }
+
+/// Build a standalone render handle without installing a global recorder.
+///
+/// The global recorder can only be installed once per process, so the
+/// acceptance suite (which constructs `AppState` in-process) uses this instead
+/// to obtain a `PrometheusHandle` for the `/metrics` endpoint.
+pub fn standalone_handle() -> PrometheusHandle {
+    PrometheusBuilder::new().build_recorder().handle()
+}

@@ -14,20 +14,15 @@
 //! Style note: comments avoid em dashes; they use colons, semicolons, and
 //! parentheses instead.
 
-mod config;
-mod hub;
-mod metrics;
-mod pipeline;
-mod state;
-
-use crate::config::AppConfig;
-use crate::pipeline::Pipeline;
-use crate::state::AppState;
 use chronos_detect::{
     DegreeHeuristic, RelationshipProvider, SurgeConfig, SurgeMonitor, parse_caida_as_rel,
 };
 use chronos_geo::GeoResolver;
 use chronos_ingest::{IngestConfig, IngestStats};
+use chronos_server::config::AppConfig;
+use chronos_server::pipeline::Pipeline;
+use chronos_server::state::AppState;
+use chronos_server::{hub, metrics};
 use chronos_topology::{AsGraph, PrefixTable};
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
