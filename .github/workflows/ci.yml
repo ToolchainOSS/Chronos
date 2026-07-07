@@ -86,3 +86,42 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  # Non-blocking: exercises the real external data sources (CAIDA archive,
+  # GeoLite2 mirror) that Chronos depends on in production. These endpoints can
+  # be down transiently, so a failure here must NOT fail CI or block a merge;
+  # instead it raises a warning annotation worth investigating (a genuine format
+  # change or a persistent outage). Never treat this job as a quality gate.
+  live-data:
+    name: Live external-data checks (non-blocking)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: live-data
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Run live-data tests
+        id: live
+        continue-on-error: true
+        # Hits the real CAIDA endpoint and the GeoLite2 mirror. Single-threaded
+        # and verbose so failures name the exact source in the log.
+        run: cargo test -p chronos-server --test live_data -- --ignored --nocapture --test-threads=1
+
+      - name: Warn on failure
+        if: steps.live.outcome == 'failure'
+        run: |
+          echo "::warning title=Live external-data check failed::A real data source \
+          (CAIDA archive or GeoLite2 mirror) was unreachable or returned unexpected \
+          data. This does not block CI, but investigate a possible outage or dataset \
+          format change. See the 'Run live-data tests' step log for the exact source."

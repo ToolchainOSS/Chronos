@@ -31,6 +31,31 @@ cargo test --workspace --all-targets
   `cargo test -p chronos-server --test acceptance`, or `cargo clippy -p <crate>`
   while iterating.
 
+## Live external-data checks (non-gating)
+
+The offline gate above never touches the network. A separate, opt-in suite
+([crates/chronos-server/tests/live_data.rs](../../crates/chronos-server/tests/live_data.rs))
+exercises the real production data sources so a silent upstream break (an
+endpoint outage or a dataset format change) is caught before it reaches users:
+
+- `caida_real_endpoint_downloads_and_parses`: resolves and parses the live CAIDA
+  AS-relationship dataset end to end.
+- `maxmind_real_db_resolves_prefix`: downloads the real GeoLite2 City and ASN
+  databases and resolves a known prefix.
+
+Both are `#[ignore]`d, so `cargo test` skips them by default and they never gate
+a PR. Run them explicitly:
+
+```bash
+cargo test -p chronos-server --test live_data -- --ignored --nocapture --test-threads=1
+```
+
+In CI the `live-data` job in [.github/workflows/ci.yml](../../.github/workflows/ci.yml)
+runs them with `continue-on-error`: a failure raises a `::warning::` annotation
+worth investigating but does **not** block the build (these endpoints are
+external and can be transiently unavailable). Never make a publish/gate job
+`needs` this one.
+
 ## Frontend
 
 ```bash
