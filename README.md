@@ -47,6 +47,17 @@ The server never ships the full graph over the wire; it emits minimal deltas:
 - Node.js 20 or newer (22 recommended) for the frontend.
 - Optional: Docker with buildx for container builds.
 
+## Cloning
+
+Agent skills are vendored as a git submodule at `.github/skills`, so clone
+recursively:
+
+```bash
+git clone --recurse-submodules <repo-url>
+# or, on an existing checkout:
+git submodule update --init --recursive
+```
+
 ## Mounted data files
 
 Chronos depends on two external datasets. Neither is bundled into the image nor
@@ -155,6 +166,23 @@ cd frontend && npm run typecheck && npm run lint && npm run build
 
 Note: GeoLite2 and CAIDA files are absent in CI (never committed), so tests
 exercise the disabled-geo and heuristic-relationship fallback paths.
+
+## For AI agents
+
+This repository is configured for a vendor-neutral, agentic development
+workflow. Start at [AGENTS.md](AGENTS.md): it is the always-on operating manual
+(tooling, boundaries, definition of done) and links out to progressive-
+disclosure domain docs under [docs/agents/](docs/agents/) that you load
+on demand:
+
+- [engineering-standards.md](docs/agents/engineering-standards.md) - full standards & output contract.
+- [pipeline.md](docs/agents/pipeline.md) - RIS ingestion, bounded channel, consumer.
+- [detection.md](docs/agents/detection.md) - topology structures & anomaly heuristics.
+- [data-files.md](docs/agents/data-files.md) - mounted GeoLite2/CAIDA files & config.
+- [egress-frontend.md](docs/agents/egress-frontend.md) - Delta protocol, Axum hub, React/Zustand.
+- [testing.md](docs/agents/testing.md) - quality gate & CI.
+
+Reusable agent skills live in the [`.github/skills`](.github/skills) submodule.
 
 ## Style
 
