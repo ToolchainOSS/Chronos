@@ -8,6 +8,7 @@ members = [
     "crates/chronos-geo",
     "crates/chronos-history",
     "crates/chronos-server",
+    "crates/chronos-soak",
 ]
 
 [workspace.package]

@@ -11,7 +11,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace --all-targets
 ```
 
-- `cargo test --workspace --all-targets` runs unit tests across all six crates
+- `cargo test --workspace --all-targets` runs unit tests across all seven crates
   plus two integration suites:
   - the **mock RIS Live integration test**
     ([crates/chronos-ingest/tests/mock_stream.rs](../../crates/chronos-ingest/tests/mock_stream.rs)),
@@ -55,6 +55,36 @@ runs them with `continue-on-error`: a failure raises a `::warning::` annotation
 worth investigating but does **not** block the build (these endpoints are
 external and can be transiently unavailable). Never make a publish/gate job
 `needs` this one.
+
+## Production soak (non-gating)
+
+The `chronos-soak` harness ([crates/chronos-soak](../../crates/chronos-soak))
+runs the release server against the real RIS Live feed for an extended window
+and emits a self-contained Markdown assurance report: the server's own
+INFO/WARN/ERROR log summary, resource usage sampled by a separate monitor (RSS,
+CPU, RIS socket ingress), and performance (throughput, ingest drop ratio,
+anomalies by kind, topology growth, and the WebSocket egress path exercised end
+to end). A short window doubles as the resource baseline
+([resource-baseline.md](resource-baseline.md)); a long window is the soak.
+
+```bash
+cargo build --release --bin chronos-server
+# args: duration_secs warmup_secs interval_secs
+cargo run --release -p chronos-soak -- 1200 60 10
+```
+
+The harness is strongly typed Rust (parsing `/proc`, `ss`, and the Prometheus
+exposition with unit-tested helpers) rather than shell, so its logic is covered
+by `cargo test -p chronos-soak`. The verdict is PASS, WARN, or FAIL; it exits
+non-zero (code 2) only on a genuine crash or panic, treating a dead upstream
+feed as a WARN (external and transient), matching the live-data philosophy.
+
+In CI the [.github/workflows/soak.yml](../../.github/workflows/soak.yml) workflow
+runs on manual dispatch (with configurable duration/warmup/RIS filter) and on a
+weekly schedule. It attaches the report to the job summary and uploads the
+report, the CSV time series, and the server log as artifacts. Like `live-data`
+it is inherently non-deterministic and MUST NOT gate merges; a FAIL verdict
+(crash) surfaces as a failed check, but a WARN does not.
 
 ## Frontend
 

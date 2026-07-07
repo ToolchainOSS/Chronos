@@ -1,0 +1,21 @@
+[package]
+name = "chronos-soak"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Chronos soak/baseline harness: runs the release server against the real RIS Live feed and reports resource and performance figures."
+
+[[bin]]
+name = "chronos-soak"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "process", "net", "io-util"] }
+tokio-tungstenite = { workspace = true, features = ["connect", "handshake"] }
+futures-util = { workspace = true, features = ["std"] }
+reqwest = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }

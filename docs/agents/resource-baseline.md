@@ -2,9 +2,11 @@
 
 Measured bandwidth, CPU, and memory for a typical running `chronos-server`
 instance, so capacity planning and regressions have a concrete reference. The
-figures come from [scripts/resource-baseline.sh](../../scripts/resource-baseline.sh),
-which runs the release binary against the real data sources and samples the
-kernel's per-process accounting.
+figures come from the `chronos-soak` harness
+([crates/chronos-soak](../../crates/chronos-soak)), which runs the release binary
+against the real data sources and samples the kernel's per-process accounting.
+The same harness, run with a longer window, is the production soak test; see
+[testing.md](testing.md).
 
 ## Headline numbers
 
@@ -31,12 +33,13 @@ profile. CPU and memory are modest and comfortably fit a small container.
   (`ws://ris-live.ripe.net/v1/ws/?client=chronos`), the CAIDA AS-relationship
   dataset (auto-downloaded), and both GeoLite2 databases (City + ASN, downloaded
   so geo resolution is active, matching a typical deployment).
-- **Window:** 45s warmup (CAIDA download, RIS connect, initial topology burst)
-  then a 180s measurement window.
+- **Window:** a short warmup (CAIDA download, RIS connect, initial topology
+  burst) then a measurement window; the harness excludes the warmup from the
+  reported figures.
 - **CPU:** `utime + stime` from `/proc/<pid>/stat` divided by the window and by
   `CLK_TCK` (100), reported both per core and normalized to the host vCPU count.
-- **Memory:** `VmRSS` from `/proc/<pid>/status`, sampled every 5s for average
-  and peak.
+- **Memory:** `VmRSS` from `/proc/<pid>/status`, sampled on a fixed cadence for
+  average and peak.
 - **Ingress:** the RIS TCP socket's `bytes_received` counter from `ss -tinp`,
   summed across the server's established connections. This reads the socket
   counter directly because `/proc/<pid>/io` `rchar` does **not** count socket
@@ -50,8 +53,8 @@ Reproduce with:
 
 ```bash
 cargo build --release --bin chronos-server
-scripts/resource-baseline.sh            # 45s warmup, 180s window (defaults)
-scripts/resource-baseline.sh 60 300     # custom warmup/window in seconds
+# args: duration_secs warmup_secs interval_secs (a short window is the baseline)
+cargo run --release -p chronos-soak -- 180 45 5
 ```
 
 ## Caveats and how to read these numbers

@@ -1,0 +1,114 @@
+name: Soak
+
+# Production assurance run: build the release server, then drive it against the
+# real RIPE RIS Live feed for an extended window and publish a Markdown report
+# (resource usage, performance, and the server's own INFO/WARN/ERROR log) as a
+# job summary plus an artifact. This exercises the real external data sources
+# (RIS, CAIDA, GeoLite2 mirror), so like the live-data CI job it is inherently
+# non-deterministic and MUST NOT gate merges; run it on demand or on a schedule.
+on:
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: "Measurement window (seconds) after warmup"
+        required: false
+        default: "1200"
+      warmup:
+        description: "Warmup grace (seconds) before measuring"
+        required: false
+        default: "60"
+      ris_host:
+        description: "Optional RIS collector filter (empty = full firehose)"
+        required: false
+        default: ""
+  schedule:
+    # Weekly, Monday 06:00 UTC. Catches slow leaks and upstream drift.
+    - cron: "0 6 * * 1"
+
+concurrency:
+  group: soak-${{ github.ref }}
+  cancel-in-progress: true
+
+# Deny-all by default; this job only reads the checked-out code and writes its
+# own artifact. No privileged token is minted.
+permissions: {}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  soak:
+    name: Soak (real RIS Live feed)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # Hard ceiling well above the longest supported window (30 min) plus build
+    # and dataset-download overhead, so a hung run cannot burn minutes forever.
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: soak
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build release server and soak harness
+        run: cargo build --release --bin chronos-server -p chronos-soak
+
+      - name: Run soak
+        id: soak
+        continue-on-error: true
+        env:
+          # Point the harness at the release binary built above; the debug-built
+          # harness is fine (it only orchestrates and samples).
+          CHRONOS_BIN: target/release/chronos-server
+          SOAK_OUT_DIR: soak-out
+          CHRONOS_RIS_HOST: ${{ github.event.inputs.ris_host }}
+        run: |
+          cargo run --release -p chronos-soak -- \
+            "${{ github.event.inputs.duration || '1200' }}" \
+            "${{ github.event.inputs.warmup || '60' }}" \
+            10
+
+      - name: Publish report to job summary
+        if: always()
+        run: |
+          if [ -f soak-out/soak-report.md ]; then
+            cat soak-out/soak-report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## Soak report missing" >> "$GITHUB_STEP_SUMMARY"
+            echo "The harness produced no report; see the run log and the" >> "$GITHUB_STEP_SUMMARY"
+            echo "uploaded artifact (server log) for details." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload soak artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: soak-report
+          path: |
+            soak-out/soak-report.md
+            soak-out/samples.csv
+            soak-out/server.log
+          if-no-files-found: warn
+          retention-days: 30
+
+      # Surface a crash (harness exit code 2) as a failed check without letting a
+      # transient upstream outage (WARN, exit 0) fail the run. The report's
+      # Verdict section explains which occurred.
+      - name: Reflect soak verdict
+        if: always()
+        run: |
+          if [ "${{ steps.soak.outcome }}" = "failure" ]; then
+            echo "::error title=Soak verdict FAIL::The server crashed or panicked \
+            during the soak. See the job summary and the soak-report artifact."
+            exit 1
+          fi
+          echo "Soak completed without a crash (PASS or WARN); see the job summary."

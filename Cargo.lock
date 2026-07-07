@@ -255,6 +255,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "chronos-soak"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "futures-util",
+ "reqwest",
+ "serde_json",
+ "tokio",
+ "tokio-tungstenite",
+]
+
+[[package]]
 name = "chronos-topology"
 version = "0.1.0"
 dependencies = [
