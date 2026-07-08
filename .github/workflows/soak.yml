@@ -60,7 +60,7 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Build release server and soak harness
-        run: cargo build --release --bin chronos-server -p chronos-soak
+        run: cargo build --release -p chronos-server -p chronos-soak
 
       - name: Run soak
         id: soak
