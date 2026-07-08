@@ -48,6 +48,19 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      # Compiler cache with the same trust boundary as CI: only trusted,
+      # maintainer-pushed refs (the default branch and release tags) may *write*
+      # the cache; every other ref, including all pull requests, is read-only.
+      # A tag's cache is scoped to its own ref, so a release build can never
+      # persist an artifact that the default-branch (gating) cache would later
+      # consume, and a pull request can never write anything at all. Keyed per
+      # target so the amd64 and arm64 matrix legs keep separate artifact sets.
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
+          save-if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
+
       - name: Build release binary
         run: cargo build --release --locked --target ${{ matrix.target }} --bin chronos-server
 
