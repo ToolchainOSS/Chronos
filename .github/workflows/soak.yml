@@ -5,7 +5,8 @@ name: Soak
 # (resource usage, performance, and the server's own INFO/WARN/ERROR log) as a
 # job summary plus an artifact. This exercises the real external data sources
 # (RIS, CAIDA, GeoLite2 mirror), so like the live-data CI job it is inherently
-# non-deterministic and MUST NOT gate merges; run it on demand or on a schedule.
+# non-deterministic and MUST NOT gate merges; run it on demand, on a schedule,
+# or automatically after CI passes on main.
 on:
   workflow_dispatch:
     inputs:
@@ -21,12 +22,21 @@ on:
         description: "Optional RIS collector filter (empty = full firehose)"
         required: false
         default: ""
+  # Per-commit health check: run automatically after the CI workflow completes
+  # on main, so every merged commit gets a real soak against the live feed. The
+  # job below only proceeds when that CI run concluded successfully.
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
   schedule:
     # Weekly, Monday 06:00 UTC. Catches slow leaks and upstream drift.
     - cron: "0 6 * * 1"
 
 concurrency:
-  group: soak-${{ github.ref }}
+  # Serialize per branch and cancel a superseded run: a newer commit's soak
+  # supersedes an older one still in flight, so rapid merges do not pile up.
+  group: soak-${{ github.event.workflow_run.head_branch || github.ref }}
   cancel-in-progress: true
 
 # Deny-all by default; this job only reads the checked-out code and writes its
@@ -40,6 +50,11 @@ jobs:
   soak:
     name: Soak (real RIS Live feed)
     runs-on: ubuntu-latest
+    # When triggered by CI completion, only soak commits whose CI passed; other
+    # triggers (manual dispatch, schedule) always run.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
     permissions:
       contents: read
     # Hard ceiling well above the longest supported window (30 min) plus build
@@ -49,6 +64,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          # Soak the exact commit CI validated; for manual/scheduled runs this
+          # falls back to the ref the workflow was dispatched on.
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -73,7 +91,7 @@ jobs:
           CHRONOS_RIS_HOST: ${{ github.event.inputs.ris_host }}
         run: |
           cargo run --release -p chronos-soak -- \
-            "${{ github.event.inputs.duration || '1200' }}" \
+            "${{ github.event.inputs.duration || (github.event_name == 'schedule' && '1200') || '600' }}" \
             "${{ github.event.inputs.warmup || '60' }}" \
             10
 
